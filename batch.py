@@ -3,6 +3,16 @@ import sys
 from pathlib import Path
 
 import pandas as pd
+import os
+
+
+def get_input_path(year, month):
+    default_pattern = (
+        "https://d37ci6vzurychx.cloudfront.net/trip-data/"
+        "yellow_tripdata_{year:04d}-{month:02d}.parquet"
+    )
+    pattern = os.getenv("INPUT_FILE_PATTERN", default_pattern)
+    return pattern.format(year=year, month=month)
 
 
 def prepare_data(df, categorical):
@@ -21,17 +31,25 @@ def prepare_data(df, categorical):
 
 
 def read_data(filename, categorical):
-    df = pd.read_parquet(filename)
+    endpoint_url = os.getenv("S3_ENDPOINT_URL")
+
+    if endpoint_url and str(filename).startswith("s3://"):
+        options = {
+            "client_kwargs": {
+                "endpoint_url": endpoint_url,
+            }
+        }
+        df = pd.read_parquet(filename, storage_options=options)
+    else:
+        df = pd.read_parquet(filename)
+
     return prepare_data(df, categorical)
 
 
 def main(year, month):
     categorical = ["PULocationID", "DOLocationID"]
 
-    input_file = (
-        "https://d37ci6vzurychx.cloudfront.net/trip-data/"
-        f"yellow_tripdata_{year:04d}-{month:02d}.parquet"
-    )
+    input_file = get_input_path(year, month)
 
     output_dir = Path("output")
     output_dir.mkdir(parents=True, exist_ok=True)
