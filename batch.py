@@ -5,8 +5,8 @@ from pathlib import Path
 import pandas as pd
 
 
-def read_data(filename, categorical):
-    df = pd.read_parquet(filename)
+def prepare_data(df, categorical):
+    df = df.copy()
 
     df["duration"] = df.tpep_dropoff_datetime - df.tpep_pickup_datetime
     df["duration"] = df.duration.dt.total_seconds() / 60
@@ -18,6 +18,11 @@ def read_data(filename, categorical):
     )
 
     return df
+
+
+def read_data(filename, categorical):
+    df = pd.read_parquet(filename)
+    return prepare_data(df, categorical)
 
 
 def main(year, month):
