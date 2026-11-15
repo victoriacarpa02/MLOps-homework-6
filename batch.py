@@ -46,14 +46,40 @@ def read_data(filename, categorical):
     return prepare_data(df, categorical)
 
 
+def get_output_path(year, month):
+    default_pattern = "output/yellow_tripdata_{year:04d}-{month:02d}.parquet"
+    pattern = os.getenv("OUTPUT_FILE_PATTERN", default_pattern)
+    return pattern.format(year=year, month=month)
+
+
+def save_data(df, filename):
+    options = None
+    endpoint_url = os.getenv("S3_ENDPOINT_URL")
+
+    if str(filename).startswith("s3://"):
+        if endpoint_url:
+            options = {
+                "client_kwargs": {
+                    "endpoint_url": endpoint_url,
+                }
+            }
+    else:
+        Path(filename).parent.mkdir(parents=True, exist_ok=True)
+
+    df.to_parquet(
+        filename,
+        engine="pyarrow",
+        index=False,
+        storage_options=options,
+    )
+
+
 def main(year, month):
     categorical = ["PULocationID", "DOLocationID"]
 
     input_file = get_input_path(year, month)
 
-    output_dir = Path("output")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    output_file = output_dir / f"yellow_tripdata_{year:04d}-{month:02d}.parquet"
+    output_file = get_output_path(year, month)
 
     with open("model.bin", "rb") as f_in:
         dv, lr = pickle.load(f_in)
@@ -70,7 +96,7 @@ def main(year, month):
         "predicted_duration": y_pred,
     })
 
-    df_result.to_parquet(output_file, engine="pyarrow", index=False)
+    save_data(df_result, output_file)
 
     print(f"Period: {year:04d}-{month:02d}")
     print("Predictions:", len(y_pred))

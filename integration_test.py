@@ -3,7 +3,12 @@ from datetime import datetime
 
 import pandas as pd
 
-from batch import get_input_path
+from batch import get_input_path, get_output_path
+
+import subprocess
+import sys
+
+from numpy.testing import assert_allclose
 
 
 def dt(hour, minute, second=0):
@@ -45,6 +50,43 @@ def main():
     print("Test period: 2023-01")
     print("Input rows:", len(df_input))
     print("Input file:", input_file)
+
+    output_file = get_output_path(2023, 1)
+
+    subprocess.run(
+        [sys.executable, "batch.py", "2023", "1"],
+        check=True,
+    )
+
+    df_result = pd.read_parquet(
+        output_file,
+        engine="pyarrow",
+        storage_options=options,
+    )
+
+    assert df_result.columns.tolist() == [
+        "ride_id",
+        "predicted_duration",
+    ]
+    assert len(df_result) == 2
+    assert df_result["ride_id"].tolist() == [
+        "2023/01_0",
+        "2023/01_1",
+    ]
+
+    assert_allclose(
+        df_result["predicted_duration"].to_numpy(),
+        [23.19714924577506, 13.08010120625567],
+        rtol=0,
+        atol=1e-6,
+    )
+
+    print("Output rows:", len(df_result))
+    print(
+        "Q6 sum of predicted durations:",
+        df_result["predicted_duration"].sum(),
+    )
+    print("Integration test PASSED")
 
 
 if __name__ == "__main__":
